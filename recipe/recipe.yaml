@@ -1,7 +1,7 @@
 schema_version: 1
 
 context:
-  version: "0.3.0"
+  version: "0.4.1"
   llvm_modern_commit: 3cbe75b1433a90a28db068d700b7effd2de8f401
 
 package:
@@ -10,7 +10,7 @@ package:
 
 source:
   - url: https://github.com/NVIDIA/numba-cuda-mlir/archive/refs/tags/v${{ version }}.tar.gz
-    sha256: c015e5c07f17d924e13aa62a64940f53c85c53ce1f2d4e1c587d50ce21023d0c
+    sha256: 77f6c86e5fd086cec89b43b85e2b2c2ed5e0d00e166ab8cfd3bf436daa8d18ee
     target_directory: src
   - url: https://github.com/llvm/llvm-project/archive/${{ llvm_modern_commit }}.tar.gz
     sha256: a2d6587b0793f7f6fb21c4607e6d86cd40377686f58162fbae5e206d2e24dfe2
