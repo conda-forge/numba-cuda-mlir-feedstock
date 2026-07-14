@@ -21,7 +21,6 @@ build:
   skip:
     - not linux
     - match(python, "<3.11")
-    - match(python, ">=3.12")
     - cuda_compiler_version != "None"
 
 outputs:
