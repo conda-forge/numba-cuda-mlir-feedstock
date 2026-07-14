@@ -115,4 +115,5 @@ about:
 
 extra:
   recipe-maintainers:
+    - conda-forge/cuda-python
     - brandon-b-miller
