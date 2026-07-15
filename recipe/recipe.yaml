@@ -54,6 +54,11 @@ outputs:
         # Upstream ci/build-llvm-modern.sh already wires it via
         # CMAKE_C/CXX_COMPILER_LAUNCHER and requires it to be present.
         - sccache
+        - if: build_platform != host_platform
+          then:
+            - cross-python_${{ host_platform }}
+            - python
+            - numpy
       host:
         - python
         # Build deps for the modern LLVM/MLIR Python bindings:
@@ -114,6 +119,11 @@ outputs:
         - ninja
         # sccache caches the wheel's native (pybind11/nanobind) compile locally.
         - sccache
+        - if: build_platform != host_platform
+          then:
+            - cross-python_${{ host_platform }}
+            - python
+            - numpy
       host:
         - python
         - pip
