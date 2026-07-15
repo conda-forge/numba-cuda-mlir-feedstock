@@ -117,6 +117,8 @@ outputs:
         - ${{ stdlib('c') }}
         - cmake >=3.24
         - ninja
+        - make
+        - git
         # sccache caches the wheel's native (pybind11/nanobind) compile locally.
         - sccache
         - if: build_platform != host_platform
