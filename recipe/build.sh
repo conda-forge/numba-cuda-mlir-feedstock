@@ -104,13 +104,14 @@ if [ "${CONDA_BUILD_CROSS_COMPILATION:-0}" = "1" ]; then
     # CMAKE_FIND_ROOT_PATH ($PREFIX + sysroot), and the find-root modes. We pass it first,
     # then override two things afterwards (cmake takes the last -D):
     #   - CMAKE_INSTALL_PREFIX (CMAKE_ARGS defaults it to $PREFIX) → our staging dir.
-    #   - FIND_ROOT_PATH_MODE_{INCLUDE,LIBRARY,PACKAGE} back to BOTH. CMAKE_ARGS sets these
-    #     to ONLY (search only $PREFIX + sysroot), but cross-python reports the host Python
+    #   - FIND_ROOT_PATH_MODE_INCLUDE back to BOTH (only this one). CMAKE_ARGS sets it to
+    #     ONLY (search only $PREFIX + sysroot), but cross-python reports the host Python
     #     headers under $BUILD_PREFIX (its crossenv venv), which is not on the find-root
     #     path — so ONLY makes MLIR's find_package(Python Development.Module) fail with
-    #     "missing Python_INCLUDE_DIRS". BOTH lets cmake accept those absolute paths.
-    #     PROGRAM stays NEVER (from CMAKE_ARGS): the interpreter and tblgen tools are passed
-    #     explicitly, so no host program should ever be searched for.
+    #     "missing Python_INCLUDE_DIRS". BOTH lets cmake accept that absolute header path.
+    #     LIBRARY stays ONLY (Development.Module links no libpython on Linux, so keeping the
+    #     stricter mode avoids pulling any build-host library into the cross link) and
+    #     PROGRAM stays NEVER — the interpreter and tblgen tools are passed explicitly.
     #
     # LLVM's cmake spins up a NATIVE ExternalProject (at ${BUILD_ROOT}/NATIVE/) for
     # build-machine tools; it inherits $CC, so without an override it would use the host
@@ -130,23 +131,20 @@ if [ "${CONDA_BUILD_CROSS_COMPILATION:-0}" = "1" ]; then
     cmake ${CMAKE_ARGS:-} "${LLVM_CMAKE_COMMON[@]}" "${MLIR_BINDINGS_FLAGS[@]}" -B "${BUILD_ROOT}" \
         -DCMAKE_INSTALL_PREFIX="${LLVM_MODERN_INSTALL}" \
         -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH \
-        -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH \
-        -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH \
         -DLLVM_TABLEGEN="${NATIVE_BUILD}/bin/llvm-tblgen" \
         -DMLIR_TABLEGEN="${NATIVE_BUILD}/bin/mlir-tblgen" \
         "-DCROSS_TOOLCHAIN_FLAGS_NATIVE=${CROSS_NATIVE_FLAGS}"
-
-    cmake --build "${BUILD_ROOT}" -j "${CPU_COUNT}"
-    cmake --install "${BUILD_ROOT}"
 else
     # ${CMAKE_ARGS} supplies conda's standard toolchain (ar/ranlib/ strip, find-root policy,
     # install libdir). Our CMAKE_INSTALL_PREFIX overrides conda's default of $PREFIX so the
     # LLVM tree lands in the staging install dir.
     cmake ${CMAKE_ARGS:-} "${LLVM_CMAKE_COMMON[@]}" "${MLIR_BINDINGS_FLAGS[@]}" -B "${BUILD_ROOT}" \
         -DCMAKE_INSTALL_PREFIX="${LLVM_MODERN_INSTALL}"
-    cmake --build "${BUILD_ROOT}" -j "${CPU_COUNT}"
-    cmake --install "${BUILD_ROOT}"
 fi
+
+# Build + install the configured tree (identical for native and cross).
+cmake --build "${BUILD_ROOT}" -j "${CPU_COUNT}"
+cmake --install "${BUILD_ROOT}"
 
 echo "=== sccache stats ==="
 sccache --show-stats
