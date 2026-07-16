@@ -48,6 +48,15 @@ requirements:
     - ninja
     - make
     - git
+    # sccache caches the LLVM/MLIR object files across local rebuilds; build.sh
+    # wires it as the compiler launcher and requires it to be present.
+    - sccache
+    # Cross-compilation: cross-python provides a native Python wrapper that
+    # produces host-platform (e.g. aarch64) extension modules on the build host.
+    - if: build_platform != host_platform
+      then:
+        - cross-python_${{ host_platform }}
+        - python
   host:
     - python
     - pip
