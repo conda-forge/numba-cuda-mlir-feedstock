@@ -47,7 +47,6 @@ requirements:
     - cmake >=3.24
     - ninja
     - make
-    - git
     # sccache caches the LLVM/MLIR object files across local rebuilds; build.sh
     # wires it as the compiler launcher and requires it to be present.
     - sccache
