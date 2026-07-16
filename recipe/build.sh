@@ -62,6 +62,7 @@ MLIR_BINDINGS_FLAGS=(
     -DMLIR_BINDINGS_PYTHON_NB_DOMAIN=numba_cuda_mlir
     -DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON
     -DPython3_EXECUTABLE="${PYTHON}"
+    -DPython_EXECUTABLE="${PYTHON}"
 )
 
 echo "=============================================================="
@@ -160,6 +161,13 @@ export DLPACK_PATH="${PREFIX}"
 export MLIR_DIR="${LLVM_MODERN_INSTALL}/lib/cmake/mlir"
 # LIBLLVM7 intentionally unset: we don't bundle libLLVM-7.so. The legacy LLVM 7
 # runtime is provided by the libllvm7.1 conda package (see symlink below).
+
+# The wheel's find_package(Python) is also unversioned and unhinted, so it too would
+# grab a stray regular python from PATH on free-threaded builds. setup.py won't forward
+# -D to its cmake, so the pin-python-executable.patch (applied via recipe.yaml) makes its
+# CMakeLists read $ENV{Python_EXECUTABLE}; export it here. ${PYTHON} is the right
+# interpreter in every case (host python natively; cross-python when cross).
+export Python_EXECUTABLE="${PYTHON}"
 
 if [ "${CONDA_BUILD_CROSS_COMPILATION:-0}" = "1" ]; then
     # numba-cuda-mlir/cext/mlir-llvm70 uses mlir_tablegen() to generate headers at build

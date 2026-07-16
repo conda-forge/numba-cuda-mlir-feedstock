@@ -12,6 +12,8 @@ source:
   - url: https://github.com/NVIDIA/numba-cuda-mlir/archive/refs/tags/v${{ version }}.tar.gz
     sha256: c015e5c07f17d924e13aa62a64940f53c85c53ce1f2d4e1c587d50ce21023d0c
     target_directory: src
+    patches:
+      - patches/pin-python-executable.patch
   - url: https://github.com/llvm/llvm-project/archive/${{ llvm_modern_commit }}.tar.gz
     sha256: a2d6587b0793f7f6fb21c4607e6d86cd40377686f58162fbae5e206d2e24dfe2
     target_directory: llvm-modern-src

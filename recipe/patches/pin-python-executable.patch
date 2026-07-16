@@ -1,0 +1,16 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -16,6 +16,13 @@
+
+ add_compile_options(-Wall)
+
++# conda build pins the interpreter via the environment so find_package(Python)
++# selects the intended conda python (e.g. free-threaded python3.14t) instead of a
++# stray regular python on PATH. setup.py hardcodes its cmake args, so -D cannot be
++# passed here, and CMake does not read Python_EXECUTABLE from the environment itself.
++if(DEFINED ENV{Python_EXECUTABLE})
++  set(Python_EXECUTABLE "$ENV{Python_EXECUTABLE}" CACHE FILEPATH "" FORCE)
++endif()
+ find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
+
+ add_custom_target(devinstall
