@@ -1,0 +1,19 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -16,6 +16,16 @@
+
+ add_compile_options(-Wall)
+
++# Pin find_package(Python) at the intended conda interpreter (e.g. python3.14t, whose
++# free-threaded env ships no plain python3.14) via the environment, so it is not resolved
++# to a stray python on PATH. setup.py hardcodes its cmake args so -D cannot be passed here,
++# and CMake does not read these variables from the environment on its own.
++if(DEFINED ENV{Python_EXECUTABLE})
++  set(Python_EXECUTABLE "$ENV{Python_EXECUTABLE}" CACHE FILEPATH "" FORCE)
++endif()
++if(DEFINED ENV{Python_FIND_ABI})
++  set(Python_FIND_ABI "$ENV{Python_FIND_ABI}")
++endif()
+ find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
+
+ add_custom_target(devinstall
