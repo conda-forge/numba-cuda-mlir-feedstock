@@ -1,9 +1,11 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 503a453..4022d85 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -16,6 +16,16 @@
-
- add_compile_options(-Wall)
-
+@@ -24,6 +24,16 @@ else()
+     add_compile_options(-Wall)
+ endif()
+ 
 +# Pin find_package(Python) at the intended conda interpreter (e.g. python3.14t, whose
 +# free-threaded env ships no plain python3.14) via the environment, so it is not resolved
 +# to a stray python on PATH. setup.py hardcodes its cmake args so -D cannot be passed here,
@@ -15,5 +17,5 @@
 +  set(Python_FIND_ABI "$ENV{Python_FIND_ABI}")
 +endif()
  find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
-
+ 
  add_custom_target(devinstall

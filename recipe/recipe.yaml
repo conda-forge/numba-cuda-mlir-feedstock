@@ -60,7 +60,6 @@ requirements:
     - pybind11
     # nanobind >2.13 breaks numba-cuda-mlir's MLIR bindings
     - nanobind >=2.9,<2.13
-    - typing-extensions
     - dlpack
     # zlib + zstd: modern LLVM/MLIR links both for compression, so the bundled
     # libMLIRPythonCAPI.so needs them at build and run time.
@@ -78,7 +77,6 @@ requirements:
   run:
     - python
     - numpy
-    - llvmlite
     - if: match(python, "<3.12")
       then: typing-extensions
     - zstd
@@ -89,7 +87,7 @@ requirements:
     - libnvjitlink >=12.3.0
     - cuda-nvvm-impl
     - cuda-cccl
-    - cuda-bindings
+    - cuda-bindings >=12.9.1,<14.0.0
     - cuda-core >=0.5.1,<2.0.0
     - libllvm7.1
 
