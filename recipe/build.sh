@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+#
+# Local debug builds (compiler cache persists across runs):
+# $ export SCCACHE_DIR=/home/you/.cache/sccache
+# $ sccache --show-stats   # "Cache location" must read: Local disk: $SCCACHE_DIR
+# $ rattler-build build --no-build-id --env-isolation none --recipe recipe/recipe.yaml -m .ci_support/linux_64_python3.14.____cp314.yaml
+#
+# --env-isolation none forwards HOME + SCCACHE_DIR into the build; the default (strict)
+# normalizes HOME and strips host env, so sccache would instead write to a throwaway
+# build-local dir that is wiped after the build.
+# --no-build-id keeps the build path stable so the cache actually hits on the next run.
 set -euo pipefail
 
 cd "${SRC_DIR}/src"
@@ -14,13 +24,65 @@ export BUILD_ROOT="${SRC_DIR}/_llvm_build"
 export LLVM_MODERN_INSTALL="${SRC_DIR}/llvm-modern-install"
 export LLVM_MODERN_SRC="${SRC_DIR}/llvm-modern-src"
 
-chmod +x ci/*.sh
-sed -i '/sccache/d' ci/build-llvm-modern.sh
+# sccache caches the LLVM/MLIR object files so local rebuilds reuse prior compiles; wire it
+# as the compiler launcher. It is a build dep, so it is always present.
+command -v sccache &>/dev/null || { echo "ERROR: sccache not found"; exit 1; }
+export CMAKE_C_COMPILER_LAUNCHER=sccache
+export CMAKE_CXX_COMPILER_LAUNCHER=sccache
 
 echo "=============================================================="
 echo "Step 1/2: Modern LLVM/MLIR + Python bindings"
 echo "=============================================================="
-ci/build-llvm-modern.sh
+
+cmake_args=(
+    -G Ninja
+    -S "${LLVM_MODERN_SRC}/llvm"
+    -B "${BUILD_ROOT}"
+    -DCMAKE_BUILD_TYPE=Release
+    -DCMAKE_INSTALL_PREFIX="${LLVM_MODERN_INSTALL}"
+    -DLLVM_ENABLE_PROJECTS=mlir
+    -DLLVM_TARGETS_TO_BUILD=NVPTX
+    -DLLVM_BUILD_TOOLS=OFF
+    -DLLVM_BUILD_EXAMPLES=OFF
+    -DLLVM_INCLUDE_TESTS=OFF
+    -DLLVM_INCLUDE_BENCHMARKS=OFF
+    -DLLVM_INCLUDE_DOCS=OFF
+    -DMLIR_ENABLE_BINDINGS_PYTHON=ON
+    -DCMAKE_CXX_FLAGS="-DMLIR_PYTHON_PACKAGE_PREFIX=numba_cuda_mlir._mlir."
+    -DMLIR_BINDINGS_PYTHON_INSTALL_PREFIX="python_packages/numba_cuda_mlir_mlir/numba_cuda_mlir/_mlir"
+    -DMLIR_BINDINGS_PYTHON_NB_DOMAIN=numba_cuda_mlir
+    -DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON
+    # MLIR (MLIRDetectPythonEnv.cmake) and the numba wheel each run find_package(Python3)
+    # *and* an unversioned find_package(Python) (nanobind looks for Python_, not Python3_).
+    # A free-threaded conda env ships only python3.14t (no python3.14), so an unpinned
+    # search skips it and grabs a stray interpreter on PATH (e.g. /opt/conda/bin/python3.12).
+    # Pin both so every find_package agrees on the conda interpreter.
+    -DPython3_EXECUTABLE="${PYTHON}"
+    -DPython_EXECUTABLE="${PYTHON}"
+)
+
+# The wheel's find_package(Python) can't take -D (setup.py hardcodes its cmake args) and
+# CMake won't read this from the environment on its own, so pin-python-executable.patch
+# forwards $ENV{Python_EXECUTABLE} / $ENV{Python_FIND_ABI}.
+export Python_EXECUTABLE="${PYTHON}"
+
+# CMake's FindPython gates each artifact on an ABI-accept list whose default excludes the
+# free-threaded "t" ABI. On a free-threaded build set FIND_ABI's free-threading field ON so
+# "t" is the required ABI (forcing this on a regular build would reject its interpreter,
+# hence the guard). Fields are [pydebug;pymalloc;unicode;freethreading] = OFF;OFF;OFF;ON.
+if [[ "$("${PYTHON}" -c 'import sysconfig; print(sysconfig.get_config_var("ABIFLAGS") or "")')" == *t* ]]; then
+    freethread_abi="OFF;OFF;OFF;ON"
+    cmake_args+=(
+        -DPython3_FIND_ABI="${freethread_abi}"
+        -DPython_FIND_ABI="${freethread_abi}"
+    )
+    export Python_FIND_ABI="${freethread_abi}"
+fi
+
+cmake "${cmake_args[@]}"
+cmake --build "${BUILD_ROOT}" -j "${PARALLEL}"
+cmake --install "${BUILD_ROOT}"
+sccache --show-stats
 
 echo "=============================================================="
 echo "Step 2/2: numba_cuda_mlir wheel"
