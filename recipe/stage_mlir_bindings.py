@@ -20,6 +20,8 @@ links the LLVM70 bridge against).
 from __future__ import annotations
 
 import argparse
+import fnmatch
+import os
 import pathlib
 import shutil
 import sys
@@ -52,11 +54,14 @@ def main() -> int:
     install_libs.mkdir(parents=True, exist_ok=True)
 
     copied = 0
-    for pattern in _RUNTIME_GLOBS:
-        for artifact in build_root.rglob(pattern):
-            if artifact.is_file():
-                shutil.copy2(artifact, install_libs / artifact.name)
+    capi_lib: pathlib.Path | None = None
+    for root, _dirs, files in os.walk(build_root):
+        for name in files:
+            if any(fnmatch.fnmatch(name, pat) for pat in _RUNTIME_GLOBS):
+                shutil.copy2(os.path.join(root, name), install_libs / name)
                 copied += 1
+            elif capi_lib is None and name == "MLIRPythonCAPI.lib":
+                capi_lib = pathlib.Path(root) / name
     print(f">>> Staged {copied} MLIR runtime artifacts into {install_libs}")
 
     ext_suffix = sysconfig.get_config_var("EXT_SUFFIX") or ".pyd"
@@ -68,7 +73,6 @@ def main() -> int:
             f"Contents:\n{listing}"
         )
 
-    capi_lib = next(build_root.rglob("MLIRPythonCAPI.lib"), None)
     if capi_lib is not None:
         dest = install_root / "lib" / "MLIRPythonCAPI.lib"
         dest.parent.mkdir(parents=True, exist_ok=True)

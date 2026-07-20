@@ -19,8 +19,6 @@ set "PYTHON=%PREFIX%\python.exe"
 :: defensively so the LLVM-C synthesis can always find llvmdev's static libs).
 if not defined LIBRARY_PREFIX set "LIBRARY_PREFIX=%PREFIX%\Library"
 if not defined LIBRARY_LIB set "LIBRARY_LIB=%LIBRARY_PREFIX%\lib"
-if not defined LIBRARY_BIN set "LIBRARY_BIN=%LIBRARY_PREFIX%\bin"
-if not defined LIBRARY_INC set "LIBRARY_INC=%LIBRARY_PREFIX%\include"
 
 if not defined PARALLEL set "PARALLEL=%CPU_COUNT%"
 if not defined PARALLEL set "PARALLEL=2"
@@ -123,8 +121,7 @@ cmake -G Ninja ^
 if errorlevel 1 exit /b 1
 cmake --build "%BRIDGE_BUILD%" --target MLIRModernToNVVM MLIRModernToNVVMSmoke -j %PARALLEL%
 if errorlevel 1 exit /b 1
-for /f "delims=" %%F in ('dir /b /s "%BRIDGE_BUILD%\MLIRModernToNVVM.dll" 2^>nul') do copy /y "%%F" "%MLIR_LIBS%\" >nul
-for /f "delims=" %%F in ('dir /b /s "%BRIDGE_BUILD%\MLIRModernToNVVM.lib" 2^>nul') do copy /y "%%F" "%MLIR_LIBS%\" >nul
+for %%E in (dll lib) do for /f "delims=" %%F in ('dir /b /s "%BRIDGE_BUILD%\MLIRModernToNVVM.%%E" 2^>nul') do copy /y "%%F" "%MLIR_LIBS%\" >nul
 if not exist "%MLIR_LIBS%\MLIRModernToNVVM.dll" (echo ERROR: MLIRModernToNVVM.dll was not produced & exit /b 1)
 
 echo ==============================================================

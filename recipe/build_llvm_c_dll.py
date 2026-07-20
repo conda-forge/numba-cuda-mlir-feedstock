@@ -96,12 +96,25 @@ def _normalize_symbol(symbol: str) -> str:
     return symbol
 
 
-def _extract_lib_exports(lib_path: pathlib.Path, dumpbin: str) -> set[str]:
-    proc = _run([dumpbin, "/nologo", "/symbols", str(lib_path)])
+def _extract_exports(
+    libs: list[pathlib.Path], dumpbin: str, work_dir: pathlib.Path
+) -> set[str]:
+    """Collect every defined LLVM* external symbol across all archives.
+
+    dumpbin accepts many inputs in one invocation, so all archives are scanned
+    in a single call via a response file (dozens of quoted paths would otherwise
+    risk the command-line length limit). Symbols need no per-lib attribution --
+    everything accumulates into one set.
+    """
+    rsp = work_dir / "dumpbin-symbols.rsp"
+    rsp.write_text(
+        "/nologo\n/symbols\n" + "".join(f'"{lib}"\n' for lib in libs),
+        encoding="utf-8",
+    )
+    proc = _run([dumpbin, f"@{rsp}"])
     if proc.returncode != 0:
         raise SystemExit(
-            f"ERROR: dumpbin failed for {lib_path} (exit {proc.returncode})\n"
-            f"{proc.stdout}\n{proc.stderr}"
+            f"ERROR: dumpbin failed (exit {proc.returncode})\n{proc.stdout}\n{proc.stderr}"
         )
     exports: set[str] = set()
     for line in proc.stdout.splitlines():
@@ -136,6 +149,12 @@ def _collect_dep_libs(
     references the MSVC DIA SDK (IID_IDiaDataSource/CLSID_DiaSource/NoRegCoCreate)
     when llvmdev is built with those features (conda-forge does). Resolve them so
     the LLVM-C.dll link finds every external symbol.
+
+    This is a hand-maintained mirror of the optional features conda-forge enables
+    in llvmdev today; the principled source of truth is ``llvm-config
+    --system-libs`` (plus the DIA SDK, which LLVM's own CMake pulls in for
+    LLVMDebugInfoPDB). If a future llvmdev enables another system dependency the
+    link fails with unresolved externals -- add it here or pass --extra-lib.
     """
     deps: list[str] = []
 
@@ -230,9 +249,7 @@ def main() -> int:
     print(f">>> Scanning {len(libs)} LLVM static archives under {lib_dir}")
     dep_libs = _collect_dep_libs(lib_dir, ns.machine, ns.extra_lib, ns.zlib_static)
 
-    exports: set[str] = set()
-    for lib in libs:
-        exports |= _extract_lib_exports(lib, dumpbin)
+    exports = _extract_exports(libs, dumpbin, work_dir)
     if "LLVMContextCreate" not in exports:
         raise SystemExit(
             "ERROR: export scan did not find LLVMContextCreate; "
