@@ -25,18 +25,28 @@ build:
     - match(python, "<3.11")
     - cuda_compiler_version != "None"
   script:
-    file: build.sh
+    file: ${{ "build.bat" if win else "build.sh" }}
     env:
       NUMBA_CUDA_MLIR_VERSION: ${{ version }}
   # The CUDA runtime libraries (cudart, nvrtc, nvjitlink, nvvm) are dlopen'd at
-  # runtime, not link time linked, and the bundled libLLVM-7.so / MLIR C-API .so
-  # are loaded dynamically, exempt them from the link checks.
+  # runtime, not link time linked, and the bundled legacy-LLVM library (libLLVM-7.so
+  # on unix / LLVM-C.dll on win) and MLIR C-API modules are loaded dynamically,
+  # exempt them from the link checks.
   dynamic_linking:
     overdepending_behavior: ignore
     missing_dso_allowlist:
-      - '*/libLLVM-7.so'
-      - '*/libMLIRPythonCAPI.so'
-      - '*/libMLIRPythonSupport-numba_cuda_mlir.so'
+      - if: unix
+        then:
+          - '*/libLLVM-7.so'
+          - '*/libMLIRPythonCAPI.so'
+          - '*/libMLIRPythonSupport-numba_cuda_mlir.so'
+      - if: win
+        then:
+          - '**/LLVM-C.dll'
+          - '**/MLIRPythonCAPI.dll'
+          - '**/MLIRModernToNVVM.dll'
+          - '**/MLIRPythonSupport-numba_cuda_mlir.dll'
+          - '**/nanobind-numba_cuda_mlir.dll'
 
 requirements:
   ignore_run_exports:
@@ -48,7 +58,8 @@ requirements:
     - ${{ stdlib('c') }}
     - cmake >=3.24
     - ninja
-    - make  # [unix]
+    - if: unix
+      then: make
     - sccache  # Add sccache to speed up local debug builds for humans
   host:
     - python
@@ -61,26 +72,39 @@ requirements:
     # nanobind >2.13 breaks numba-cuda-mlir's MLIR bindings
     - nanobind >=2.9,<2.13
     - dlpack
-    # zlib + zstd: modern LLVM/MLIR links both for compression, so the bundled
-    # libMLIRPythonCAPI.so needs them at build and run time.
+    # zlib: on unix modern LLVM/MLIR links it dynamically (libMLIRPythonCAPI.so);
+    # on win it provides the import lib that LLVM-C.dll links zlib against.
     - zlib
-    - zstd
+    # zstd: only unix links it (modern LLVM/MLIR). The win LLVM build disables
+    # zstd and LLVM 7 predates zstd, so nothing on win needs it.
+    - if: unix
+      then: zstd
     # CUDA headers only (no nvcc). numba-cuda-mlir handles CUDA ABI compat at
     # runtime, so the build-time CUDA version is not significant. NVRTC/nvJitLink
     # headers aren't needed at build time (those libraries are dlopen'd).
     - cuda-version 13.*
     - cuda-cudart-dev
-    - cuda-driver-dev
+    # cuda-driver-dev (cuda.h + libcuda stub) is unix-only on conda-forge; on
+    # win-64 cuda.h ships in cuda-cudart-dev, which satisfies FindCUDAToolkit.
+    - if: unix
+      then: cuda-driver-dev
     - cuda-crt-dev_${{ target_platform }}
     - cuda-cccl
-    - libllvm7.1  # [unix]
-    - llvmdev 7.1.*  # [win]
+    # unix: prebuilt shared libLLVM-7.1.so (symlinked to libLLVM-7.so at runtime).
+    # win: LLVM 7 ships only as static libs; build.bat synthesizes LLVM-C.dll from
+    # them and bundles it into the wheel (see build_llvm_c_dll.py).
+    - if: unix
+      then: libllvm7.1
+    - if: win
+      then: llvmdev 7.1.*
   run:
     - python
     - numpy
     - if: match(python, "<3.12")
       then: typing-extensions
-    - zstd
+    # zstd is only linked by the unix LLVM/MLIR build (see host note).
+    - if: unix
+      then: zstd
     - packaging
     - cuda-version >=12.2,<14.0.0a0
     - cuda-cudart
@@ -90,7 +114,9 @@ requirements:
     - cuda-cccl
     - cuda-bindings >=12.9.1,<14.0.0
     - cuda-core >=0.5.1,<2.0.0
-    - libllvm7.1  # [unix]
+    # win bundles LLVM-C.dll inside the wheel, so no runtime LLVM dep there.
+    - if: unix
+      then: libllvm7.1
 
 tests:
   - python:
@@ -101,8 +127,14 @@ tests:
   - script:
       - python -c "import numba_cuda_mlir; from numba_cuda_mlir import cuda"
       # Confirm the bundled native libraries are present and located.
-      - python -c "import numba_cuda_mlir._mlir._mlir_libs as L, os; assert os.path.exists(os.path.join(os.path.dirname(L.__file__), 'libMLIRPythonCAPI.so'))"
-      - python -c "import numba_cuda_mlir, os; assert os.path.exists(os.path.join(os.path.dirname(numba_cuda_mlir.__file__), 'lib', 'libLLVM-7.so'))"
+      - if: linux
+        then:
+          - python -c "import numba_cuda_mlir._mlir._mlir_libs as L, os; assert os.path.exists(os.path.join(os.path.dirname(L.__file__), 'libMLIRPythonCAPI.so'))"
+          - python -c "import numba_cuda_mlir, os; assert os.path.exists(os.path.join(os.path.dirname(numba_cuda_mlir.__file__), 'lib', 'libLLVM-7.so'))"
+      - if: win
+        then:
+          - python -c "import numba_cuda_mlir._mlir._mlir_libs as L, os; assert os.path.exists(os.path.join(os.path.dirname(L.__file__), 'MLIRPythonCAPI.dll'))"
+          - python -c "import numba_cuda_mlir, os; assert os.path.exists(os.path.join(os.path.dirname(numba_cuda_mlir.__file__), 'lib', 'LLVM-C.dll'))"
 
 about:
   homepage: https://github.com/NVIDIA/numba-cuda-mlir
