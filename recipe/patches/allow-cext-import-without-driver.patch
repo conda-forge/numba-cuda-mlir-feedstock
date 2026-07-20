@@ -1,0 +1,141 @@
+diff --git a/cext/launcher/cuda_helper.cpp b/cext/launcher/cuda_helper.cpp
+index 180bce9c..cbd4db5a 100644
+--- a/cext/launcher/cuda_helper.cpp
++++ b/cext/launcher/cuda_helper.cpp
+@@ -15,6 +15,9 @@ const char* get_cuda_error(CUresult res) {
+ }
+ 
+ PyObject* get_max_grid_size(PyObject*, PyObject *args) {
++    if (!ensure_cuda_available())
++        return NULL;
++
+     int device_id;
+     if (!PyArg_ParseTuple(args, "i", &device_id))
+         return NULL;
+@@ -38,6 +41,9 @@ PyObject* get_max_grid_size(PyObject*, PyObject *args) {
+ }
+ 
+ PyObject* get_compute_capability(PyObject*, PyObject*) {
++    if (!ensure_cuda_available())
++        return NULL;
++
+     int major, minor;
+     CUdevice dev;
+     CUresult res = g_cuDeviceGet(&dev, 0);
+diff --git a/cext/launcher/cuda_loader.cpp b/cext/launcher/cuda_loader.cpp
+index 3e9a9815..72aa9c24 100644
+--- a/cext/launcher/cuda_loader.cpp
++++ b/cext/launcher/cuda_loader.cpp
+@@ -5,6 +5,8 @@
+ #include "cuda_loader.h"
+ #include "cuda_helper.h"
+ 
++#include <string>
++
+ #ifdef _WIN32
+ #include <windows.h>
+ #else
+@@ -119,7 +121,13 @@ FOREACH_CUDA_FUNCTION_TO_LOAD(DEFINE_CUDA_FUNCTION_GLOBAL)
+         return ErrorRaised;
+ 
+ 
+-Status cuda_loader_init() {
++// A missing driver is deliberately NOT fatal here so cuda may be imported
++// on a cpu only machine.
++static bool g_cuda_available = false;
++static std::string g_cuda_load_error;
++
++
++static Status load_cuda_driver() {
+     // loader is static to keep the handle alive for the lifetime of the process
+ #ifdef _WIN32
+     static DynamicLoader loader("nvcuda.dll");
+@@ -140,3 +148,46 @@ Status cuda_loader_init() {
+ 
+     return OK;
+ }
++
++Status cuda_loader_init() {
++    if (load_cuda_driver()) {
++        g_cuda_available = true;
++        return OK;
++    }
++
++    // defer driver search to ensure_cuda_available().
++    g_cuda_available = false;
++    if (PyErr_Occurred()) {
++        PyObject *type, *value, *tb;
++        PyErr_Fetch(&type, &value, &tb);
++        if (value) {
++            PyObject* str = PyObject_Str(value);
++            if (str) {
++                const char* c = PyUnicode_AsUTF8(str);
++                if (c)
++                    g_cuda_load_error = c;
++                Py_DECREF(str);
++            }
++        }
++        Py_XDECREF(type);
++        Py_XDECREF(value);
++        Py_XDECREF(tb);
++        PyErr_Clear();
++    }
++    if (g_cuda_load_error.empty())
++        g_cuda_load_error = "the CUDA driver library (libcuda.so.1) could not be loaded";
++    return OK;
++}
++
++bool cuda_is_available() {
++    return g_cuda_available;
++}
++
++Status ensure_cuda_available() {
++    if (g_cuda_available)
++        return OK;
++    return raise(PyExc_RuntimeError,
++                 "CUDA is not available: %s. A working NVIDIA driver is required "
++                 "for GPU operations (importing numba_cuda_mlir succeeds without one).",
++                 g_cuda_load_error.c_str());
++}
+diff --git a/cext/launcher/cuda_loader.h b/cext/launcher/cuda_loader.h
+index 6103f3de..89cc4478 100644
+--- a/cext/launcher/cuda_loader.h
++++ b/cext/launcher/cuda_loader.h
+@@ -9,6 +9,10 @@
+ 
+ Status cuda_loader_init();
+ 
++bool cuda_is_available();
++
++Status ensure_cuda_available();
++
+ #define FOREACH_CUDA_FUNCTION_TO_LOAD(X) \
+     X(cuInit, 2000) \
+     X(cuLibraryLoadData, 12000) \
+diff --git a/cext/launcher/kernel.cpp b/cext/launcher/kernel.cpp
+index 3b55dbbe..cc59bd8b 100644
+--- a/cext/launcher/kernel.cpp
++++ b/cext/launcher/kernel.cpp
+@@ -122,6 +122,8 @@ class CudaLibrary {
+ };
+ 
+ Result<CudaLibrary> load_cuda_library(const void* cubin) {
++    if (!ensure_cuda_available())
++        return ErrorRaised;
+     // Get current context to associate with library.
+     // We require that CUDA is already initialized and a context exists.
+     // This is typically done by numba's driver or by the user.
+diff --git a/cext/launcher/module.cpp b/cext/launcher/module.cpp
+index fda88126..8b85cf5c 100644
+--- a/cext/launcher/module.cpp
++++ b/cext/launcher/module.cpp
+@@ -45,5 +45,9 @@ PyMODINIT_FUNC PyInit__cext() {
+     if (!llvm_downgrade_init(m.get()))
+         return nullptr;
+ 
++    if (PyModule_AddIntConstant(m.get(), "cuda_available",
++                                cuda_is_available() ? 1 : 0) < 0)
++        return nullptr;
++
+     return m.release();
+ }

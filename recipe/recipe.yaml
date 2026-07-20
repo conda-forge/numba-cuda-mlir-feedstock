@@ -14,6 +14,10 @@ source:
     target_directory: src
     patches:
       - patches/pin-python-executable.patch
+      # Backport NVIDIA/numba-cuda-mlir#226: let `cext` import on CPU-only
+      # machines by deferring the CUDA driver load instead of failing hard at
+      # import time. Drop once the fix ships in a tagged release.
+      - patches/allow-cext-import-without-driver.patch
   - url: https://github.com/llvm/llvm-project/archive/${{ llvm_modern_commit }}.tar.gz
     sha256: a2d6587b0793f7f6fb21c4607e6d86cd40377686f58162fbae5e206d2e24dfe2
     target_directory: llvm-modern-src
