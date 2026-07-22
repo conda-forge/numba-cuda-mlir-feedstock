@@ -21,6 +21,7 @@ if not defined LIBRARY_PREFIX set "LIBRARY_PREFIX=%PREFIX%\Library"
 if not defined LIBRARY_LIB set "LIBRARY_LIB=%LIBRARY_PREFIX%\lib"
 
 if not defined PARALLEL set "PARALLEL=%CPU_COUNT%"
+if not defined PARALLEL set "PARALLEL=%NUMBER_OF_PROCESSORS%"
 if not defined PARALLEL set "PARALLEL=2"
 echo Building with PARALLEL=%PARALLEL% compile jobs
 
