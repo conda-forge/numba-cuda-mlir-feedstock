@@ -32,12 +32,16 @@ set "MLIR_LIBS=%MLIR_PKG%\_mlir_libs"
 set "BRIDGE_BUILD=%BUILD_ROOT%\mlir-modern-to-nvvm"
 set "LLVM_C_OUT=%SRC_DIR%\llvm-c-install"
 
-:: sccache caches the LLVM/MLIR object compiles across local rebuilds. setup.py
-:: reads these env vars and forwards them to the wheel's cmake; our own cmake
-:: calls below also pass them explicitly with -D.
-where sccache >nul 2>nul || (echo ERROR: sccache not found & exit /b 1)
-set "CMAKE_C_COMPILER_LAUNCHER=sccache"
-set "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
+:: sccache speeds up local rebuilds; skip it in CI (cold cache). conda-forge sets
+:: CI=azure|github_actions. setup.py reads these env vars for the wheel's cmake; our own
+:: cmake calls pass them via %LAUNCHER_ARGS%.
+set "LAUNCHER_ARGS="
+if not defined CI (
+    where sccache >nul 2>nul || (echo ERROR: sccache not found & exit /b 1)
+    set "CMAKE_C_COMPILER_LAUNCHER=sccache"
+    set "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
+    set "LAUNCHER_ARGS=-DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache"
+)
 
 :: pin-python-executable.patch reads $ENV{Python_EXECUTABLE} in the wheel's cmake.
 set "Python_EXECUTABLE=%PYTHON%"
@@ -61,8 +65,7 @@ cmake -G Ninja ^
   -DCMAKE_INSTALL_PREFIX="%LLVM_MODERN_INSTALL%" ^
   -DCMAKE_C_COMPILER=cl ^
   -DCMAKE_CXX_COMPILER=cl ^
-  -DCMAKE_C_COMPILER_LAUNCHER=sccache ^
-  -DCMAKE_CXX_COMPILER_LAUNCHER=sccache ^
+  %LAUNCHER_ARGS% ^
   -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL ^
   -DLLVM_USE_CRT_RELEASE=MD ^
   -DLLVM_ENABLE_PROJECTS=mlir ^
@@ -95,7 +98,7 @@ cmake --build "%BUILD_ROOT%" -j %PARALLEL%
 if errorlevel 1 exit /b 1
 cmake --install "%BUILD_ROOT%"
 if errorlevel 1 exit /b 1
-sccache --show-stats
+if not defined CI sccache --show-stats
 
 echo ==============================================================
 echo Step 1b: Stage MLIR Python bindings into the install tree
@@ -115,8 +118,7 @@ cmake -G Ninja ^
   -DLLVM_DIR="%LLVM_MODERN_INSTALL%\lib\cmake\llvm" ^
   -DCMAKE_C_COMPILER=cl ^
   -DCMAKE_CXX_COMPILER=cl ^
-  -DCMAKE_C_COMPILER_LAUNCHER=sccache ^
-  -DCMAKE_CXX_COMPILER_LAUNCHER=sccache ^
+  %LAUNCHER_ARGS% ^
   -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL
 if errorlevel 1 exit /b 1
 cmake --build "%BRIDGE_BUILD%" --target MLIRModernToNVVM MLIRModernToNVVMSmoke -j %PARALLEL%
