@@ -33,11 +33,13 @@ set "MLIR_LIBS=%MLIR_PKG%\_mlir_libs"
 set "BRIDGE_BUILD=%BUILD_ROOT%\mlir-modern-to-nvvm"
 set "LLVM_C_OUT=%SRC_DIR%\llvm-c-install"
 
-:: sccache speeds up local rebuilds; skip it in CI (cold cache). conda-forge sets
-:: CI=azure|github_actions. setup.py reads these env vars for the wheel's cmake; our own
-:: cmake calls pass them via %LAUNCHER_ARGS%.
+:: sccache speeds up local rebuilds; skip it in CI (cold cache, and its daemon holds
+:: the work dir open which breaks cleanup). CI is forwarded via the recipe's script
+:: env (rattler-build's isolation strips it otherwise); test the value, not `defined`,
+:: since it may arrive as an empty string. setup.py reads these env vars for the wheel's
+:: cmake; our own cmake calls pass them via %LAUNCHER_ARGS%.
 set "LAUNCHER_ARGS="
-if not defined CI (
+if "%CI%"=="" (
     where sccache >nul 2>nul || (echo ERROR: sccache not found & exit /b 1)
     set "CMAKE_C_COMPILER_LAUNCHER=sccache"
     set "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
@@ -99,7 +101,7 @@ cmake --build "%BUILD_ROOT%" -j %PARALLEL%
 if errorlevel 1 exit /b 1
 cmake --install "%BUILD_ROOT%"
 if errorlevel 1 exit /b 1
-if not defined CI sccache --show-stats
+if "%CI%"=="" sccache --show-stats
 
 echo ==============================================================
 echo Step 1b: Stage MLIR Python bindings into the install tree
@@ -149,3 +151,11 @@ set "LIBLLVM7=%LLVM_C_OUT%\LLVM-C.dll"
 if errorlevel 1 exit /b 1
 
 echo === Windows build complete ===
+
+:: Stop the sccache daemon before rattler-build packages/cleans up. Under env
+:: isolation rattler-build remaps HOME into the work dir, so sccache's cache lands
+:: inside work\, and the running server keeps those files mapped -- which makes the
+:: post-package cleanup fail to delete work\ with "Access is denied (os error 5)".
+:: Unconditional and exit /b 0 so a missing server never fails the build.
+sccache --stop-server >nul 2>nul
+exit /b 0

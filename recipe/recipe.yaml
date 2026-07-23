@@ -32,6 +32,9 @@ build:
     file: ${{ "build.bat" if win else "build.sh" }}
     env:
       NUMBA_CUDA_MLIR_VERSION: ${{ version }}
+      # rattler-build's env isolation strips host vars, so forward CI explicitly;
+      # the build scripts read it to skip sccache in CI (see build.bat/build.sh).
+      CI: ${{ env.get("CI", default="") }}
   # The CUDA runtime libraries (cudart, nvrtc, nvjitlink, nvvm) are dlopen'd at
   # runtime, not link time linked, and the bundled legacy-LLVM library (libLLVM-7.so
   # on unix / LLVM-C.dll on win) and MLIR C-API modules are loaded dynamically,
