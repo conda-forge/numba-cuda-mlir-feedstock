@@ -24,11 +24,13 @@ export BUILD_ROOT="${SRC_DIR}/_llvm_build"
 export LLVM_MODERN_INSTALL="${SRC_DIR}/llvm-modern-install"
 export LLVM_MODERN_SRC="${SRC_DIR}/llvm-modern-src"
 
-# sccache caches the LLVM/MLIR object files so local rebuilds reuse prior compiles; wire it
-# as the compiler launcher. It is a build dep, so it is always present.
-command -v sccache &>/dev/null || { echo "ERROR: sccache not found"; exit 1; }
-export CMAKE_C_COMPILER_LAUNCHER=sccache
-export CMAKE_CXX_COMPILER_LAUNCHER=sccache
+# sccache speeds up local rebuilds; skip it in CI (cold cache). conda-forge sets
+# CI=azure|github_actions.
+if [ -z "${CI:-}" ]; then
+  command -v sccache &>/dev/null || { echo "ERROR: sccache not found"; exit 1; }
+  export CMAKE_C_COMPILER_LAUNCHER=sccache
+  export CMAKE_CXX_COMPILER_LAUNCHER=sccache
+fi
 
 echo "=============================================================="
 echo "Step 1/2: Modern LLVM/MLIR + Python bindings"
@@ -82,7 +84,7 @@ fi
 cmake "${cmake_args[@]}"
 cmake --build "${BUILD_ROOT}" -j "${PARALLEL}"
 cmake --install "${BUILD_ROOT}"
-sccache --show-stats
+[ -z "${CI:-}" ] && sccache --show-stats
 
 echo "=============================================================="
 echo "Step 2/2: numba_cuda_mlir wheel"

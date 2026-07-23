@@ -10,3 +10,6 @@ github:
 provider:
   linux_aarch64: default
   linux_64: default
+  win_64: github_actions
+workflow_settings:
+  free_disk_space: quick
