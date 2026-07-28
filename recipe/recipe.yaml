@@ -79,13 +79,6 @@ requirements:
     # nanobind >2.13 breaks numba-cuda-mlir's MLIR bindings
     - nanobind >=2.9,<2.13
     - dlpack
-    # zlib: on unix modern LLVM/MLIR links it dynamically (libMLIRPythonCAPI.so);
-    # on win it provides the import lib that LLVM-C.dll links zlib against.
-    - zlib
-    # zstd: only unix links it (modern LLVM/MLIR). The win LLVM build disables
-    # zstd and LLVM 7 predates zstd, so nothing on win needs it.
-    - if: unix
-      then: zstd
     # CUDA headers only (no nvcc). numba-cuda-mlir handles CUDA ABI compat at
     # runtime, so the build-time CUDA version is not significant. NVRTC/nvJitLink
     # headers aren't needed at build time (those libraries are dlopen'd).
@@ -109,9 +102,6 @@ requirements:
     - numpy
     - if: match(python, "<3.12")
       then: typing-extensions
-    # zstd is only linked by the unix LLVM/MLIR build (see host note).
-    - if: unix
-      then: zstd
     - packaging
     - cuda-version >=12.2,<14.0.0a0
     - cuda-cudart
