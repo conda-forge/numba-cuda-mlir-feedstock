@@ -73,13 +73,12 @@ def main() -> int:
             f"Contents:\n{listing}"
         )
 
-    if capi_lib is not None:
-        dest = install_root / "lib" / "MLIRPythonCAPI.lib"
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(capi_lib, dest)
-        print(f">>> Staged import lib {dest}")
-    else:
-        print("WARNING: MLIRPythonCAPI.lib not found in build tree")
+    if capi_lib is None:
+        raise SystemExit("ERROR: MLIRPythonCAPI.lib not found in build tree")
+    dest = install_root / "lib" / "MLIRPythonCAPI.lib"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(capi_lib, dest)
+    print(f">>> Staged import lib {dest}")
 
     return 0
 
