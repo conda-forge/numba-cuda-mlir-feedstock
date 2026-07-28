@@ -100,10 +100,11 @@ requirements:
       then: typing-extensions
     - packaging
     - cuda-version >=12.2,<14.0.0a0
-    - cuda-cudart
+    - cuda-cudart-dev
     - cuda-nvrtc
     - libnvjitlink >=12.3.0
     - cuda-nvvm-impl
+    - cuda-nvvm-tools
     - cuda-cccl
     - cuda-bindings >=12.9.1,<14.0.0
     - cuda-core >=0.5.1,<2.0.0
