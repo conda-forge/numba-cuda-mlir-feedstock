@@ -19,7 +19,7 @@ source:
     target_directory: llvm-modern-src
 
 build:
-  number: 0
+  number: 1
   skip:
     - not (linux or win)
     - match(python, "<3.11")
@@ -77,18 +77,8 @@ requirements:
     - dlpack
     # The LLVM-C.dll that we create here for Windows links against zlib. Remove if we
     # migrate LLVM-C.dll creation to the llvmdev-feedstock.
-    - zlib  # [win]
-    # CUDA headers only (no nvcc). numba-cuda-mlir handles CUDA ABI compat at
-    # runtime, so the build-time CUDA version is not significant. NVRTC/nvJitLink
-    # headers aren't needed at build time (those libraries are dlopen'd).
-    - cuda-version 13.*
-    - cuda-cudart-dev
-    # cuda-driver-dev (cuda.h + libcuda stub) is unix-only on conda-forge; on
-    # win-64 cuda.h ships in cuda-cudart-dev, which satisfies FindCUDAToolkit.
-    - if: unix
-      then: cuda-driver-dev
-    - cuda-crt-dev_${{ target_platform }}
-    - cuda-cccl
+    - if: win
+      then: zlib
     # unix: prebuilt shared libLLVM-7.1.so (symlinked to libLLVM-7.so at runtime).
     # win: LLVM 7 ships only as static libs; build.bat synthesizes LLVM-C.dll from
     # them and bundles it into the wheel (see build_llvm_c_dll.py).
