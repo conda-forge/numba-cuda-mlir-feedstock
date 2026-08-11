@@ -42,31 +42,73 @@ conda config --add channels conda-forge
 conda config --set channel_priority strict
 ```
 
-Once the `conda-forge` channel has been enabled, `numba-cuda-mlir` can be installed with `conda`:
+How to use
+----------
+
+<details>
+<summary>With conda</summary>
 
 ```
 conda install numba-cuda-mlir
 ```
 
-or with `mamba`:
+</details>
+
+<details>
+<summary>With mamba</summary>
 
 ```
 mamba install numba-cuda-mlir
 ```
 
-It is possible to list all of the versions of `numba-cuda-mlir` available on your platform with `conda`:
+</details>
+
+<details>
+<summary>With pixi</summary>
+
+```
+# for adding to your local project
+pixi add numba-cuda-mlir
+# for installing globally
+pixi global install numba-cuda-mlir
+```
+
+</details>
+
+Search package versions
+-----------------------
+
+It is possible to list all of the versions of `numba-cuda-mlir` available on your platform:
+
+<details>
+<summary>With conda</summary>
 
 ```
 conda search numba-cuda-mlir --channel conda-forge
 ```
 
-or with `mamba`:
+</details>
+
+<details>
+<summary>With mamba</summary>
 
 ```
 mamba search numba-cuda-mlir --channel conda-forge
 ```
 
-Alternatively, `mamba repoquery` may provide more information:
+</details>
+
+<details>
+<summary>With pixi</summary>
+
+```
+pixi search numba-cuda-mlir --channel conda-forge
+```
+
+</details>
+
+<details>
+<summary>With mamba repoquery, which may provide more information</summary>
 
 ```
 # Search all versions available on your platform:
@@ -78,6 +120,8 @@ mamba repoquery whoneeds numba-cuda-mlir --channel conda-forge
 # List dependencies of `numba-cuda-mlir`:
 mamba repoquery depends numba-cuda-mlir --channel conda-forge
 ```
+
+</details>
 
 
 About conda-forge
@@ -148,7 +192,4 @@ Feedstock Maintainers
 
 * [@brandon-b-miller](https://github.com/brandon-b-miller/)
 * [@conda-forge/cuda-python](https://github.com/orgs/conda-forge/teams/cuda-python/)
-
-
-<!-- dummy commit to enable rerendering -->
 
