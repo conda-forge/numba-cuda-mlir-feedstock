@@ -15,7 +15,7 @@ source:
     patches:
       - patches/pin-python-executable.patch
   - url: https://github.com/llvm/llvm-project/archive/${{ llvm_modern_commit }}.tar.gz
-    sha256: a2d6587b0793f7f6fb21c4607e6d86cd40377686f58162fbae5e206d2e24dfe2
+    sha256: 442c70d3d2d33b93a7e787c0bd8db4b7eed76e6ed1cffb25c348a240add192d3
     target_directory: llvm-modern-src
 
 build:
@@ -91,12 +91,19 @@ requirements:
     - numpy
     - if: match(python, "<3.12")
       then: typing-extensions
+    - packaging
+    - cuda-version >=12.2,<14.0.0a0
+    - cuda-cudart-dev
+    - cuda-nvrtc
+    - libnvjitlink >=12.3.0
+    - cuda-nvvm-impl
+    - cuda-nvvm-tools
     - cuda-bindings >=12.9.1,<14.0.0
     - cuda-core >=0.5.1,<2.0.0
+    # win bundles LLVM-C.dll inside the wheel, so no runtime LLVM dep there.
     - if: unix
       then: libllvm7.1
 
-    - typing_extensions
 tests:
   - python:
       imports:
