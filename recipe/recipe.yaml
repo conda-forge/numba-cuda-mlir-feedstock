@@ -15,7 +15,7 @@ source:
     patches:
       - patches/pin-python-executable.patch
   - url: https://github.com/llvm/llvm-project/archive/${{ llvm_modern_commit }}.tar.gz
-    sha256: 442c70d3d2d33b93a7e787c0bd8db4b7eed76e6ed1cffb25c348a240add192d3
+    sha256: a2d6587b0793f7f6fb21c4607e6d86cd40377686f58162fbae5e206d2e24dfe2
     target_directory: llvm-modern-src
 
 build:
