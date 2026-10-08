@@ -20,6 +20,16 @@ set "PYTHON=%PREFIX%\python.exe"
 if not defined LIBRARY_PREFIX set "LIBRARY_PREFIX=%PREFIX%\Library"
 if not defined LIBRARY_LIB set "LIBRARY_LIB=%LIBRARY_PREFIX%\lib"
 
+:: win-arm64 is missing two packages win-64 has, so two steps below are skipped
+:: there: llvmdev 7.1 (LLVM 7 predates Windows on Arm, and the legacy path it
+:: feeds is only reached below sm_100, which no Arm Windows platform is) and
+:: sccache (local builds just run uncached).
+:: The recipe forwards TARGET_PLATFORM; fall back to the host architecture so a
+:: hand-run build outside rattler-build still picks the right branch.
+set "WIN_ARM64="
+if /i "%TARGET_PLATFORM%"=="win-arm64" set "WIN_ARM64=1"
+if "%TARGET_PLATFORM%"=="" if /i "%PROCESSOR_ARCHITECTURE%"=="ARM64" set "WIN_ARM64=1"
+
 if not defined PARALLEL set "PARALLEL=%CPU_COUNT%"
 if not defined PARALLEL set "PARALLEL=%NUMBER_OF_PROCESSORS%"
 if not defined PARALLEL set "PARALLEL=2"
@@ -39,7 +49,7 @@ set "LLVM_C_OUT=%SRC_DIR%\llvm-c-install"
 :: since it may arrive as an empty string. setup.py reads these env vars for the wheel's
 :: cmake; our own cmake calls pass them via %LAUNCHER_ARGS%.
 set "LAUNCHER_ARGS="
-if "%CI%"=="" (
+if "%CI%"=="" if not defined WIN_ARM64 (
     where sccache >nul 2>nul || (echo ERROR: sccache not found & exit /b 1)
     set "CMAKE_C_COMPILER_LAUNCHER=sccache"
     set "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
@@ -129,11 +139,13 @@ if errorlevel 1 exit /b 1
 for %%E in (dll lib) do for /f "delims=" %%F in ('dir /b /s "%BRIDGE_BUILD%\MLIRModernToNVVM.%%E" 2^>nul') do copy /y "%%F" "%MLIR_LIBS%\" >nul
 if not exist "%MLIR_LIBS%\MLIRModernToNVVM.dll" (echo ERROR: MLIRModernToNVVM.dll was not produced & exit /b 1)
 
+if defined WIN_ARM64 goto skip_llvm7
 echo ==============================================================
 echo Step 2: Synthesize LLVM-C.dll from conda llvmdev static libs
 echo ==============================================================
 "%PYTHON%" "%RECIPE_DIR%\build_llvm_c_dll.py" --lib-dir "%LIBRARY_LIB%" --out-dir "%LLVM_C_OUT%" --dll-name LLVM-C
 if errorlevel 1 exit /b 1
+:skip_llvm7
 
 echo ==============================================================
 echo Step 3: numba_cuda_mlir wheel
@@ -145,8 +157,9 @@ set "DLPACK_PATH=%LIBRARY_PREFIX%"
 set "MLIR_DIR=%LLVM_MODERN_INSTALL%\lib\cmake\mlir"
 :: setup.py._stage_libllvm7 bundles this DLL into numba_cuda_mlir\lib\ (keeps the
 :: basename on Windows). At runtime CAPILoader LoadLibrary's it. No symlink step
-:: (that is Linux-only).
-set "LIBLLVM7=%LLVM_C_OUT%\LLVM-C.dll"
+:: (that is Linux-only). Left unset on win-arm64, where setup.py skips the
+:: staging step anyway.
+if not defined WIN_ARM64 set "LIBLLVM7=%LLVM_C_OUT%\LLVM-C.dll"
 "%PYTHON%" -m pip install . --no-build-isolation --no-deps -vv
 if errorlevel 1 exit /b 1
 

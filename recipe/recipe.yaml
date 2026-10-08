@@ -19,7 +19,7 @@ source:
     target_directory: llvm-modern-src
 
 build:
-  number: 0
+  number: 1
   skip:
     - not (linux or win)
     - match(python, "<3.11")
@@ -31,6 +31,9 @@ build:
       # rattler-build's env isolation strips host vars, so forward CI explicitly;
       # the build scripts read it to skip sccache in CI (see build.bat/build.sh).
       CI: ${{ env.get("CI", default="") }}
+      # build.bat reads this to tell win-arm64 from win-64; the two differ in
+      # which packages conda-forge has for them (see the host section below).
+      TARGET_PLATFORM: ${{ target_platform }}
   # The CUDA runtime libraries (cudart, nvrtc, nvjitlink, nvvm) are dlopen'd at
   # runtime, not link time linked, and the bundled legacy-LLVM library (libLLVM-7.so
   # on unix / LLVM-C.dll on win) and MLIR C-API modules are loaded dynamically,
@@ -63,7 +66,8 @@ requirements:
     - ninja
     - if: unix
       then: make
-    - sccache  # Add sccache to speed up local debug builds for humans
+    - if: not (win and arm64)
+      then: sccache
   host:
     - python
     - pip
@@ -77,14 +81,20 @@ requirements:
     - dlpack
     # The LLVM-C.dll that we create here for Windows links against zlib. Remove if we
     # migrate LLVM-C.dll creation to the llvmdev-feedstock.
-    - if: win
+    - if: win and not arm64
       then: zlib
+    # The legacy path translates MLIR to the LLVM 7 dialect of NVVM IR, which
+    # libnvvm requires below sm_100.
     # unix: prebuilt shared libLLVM-7.1.so (symlinked to libLLVM-7.so at runtime).
     # win: LLVM 7 ships only as static libs; build.bat synthesizes LLVM-C.dll from
     # them and bundles it into the wheel (see build_llvm_c_dll.py).
+    # win-arm64: omitted. LLVM 7 predates Windows on Arm, so conda-forge has no
+    # build of it for that platform, and conda-forge has no CUDA 12 there either
+    # -- every Arm Windows platform is sm_100 or newer, which only ever takes the
+    # modern path. setup.py makes the same call via its IS_WINDOWS_ARM64 check.
     - if: unix
       then: libllvm7.1
-    - if: win
+    - if: win and not arm64
       then: llvmdev 7.1.*
   run:
     - python
@@ -120,6 +130,9 @@ tests:
       - if: win
         then:
           - python -c "import numba_cuda_mlir._mlir._mlir_libs as L, os; assert os.path.exists(os.path.join(os.path.dirname(L.__file__), 'MLIRPythonCAPI.dll'))"
+      # Not on win-arm64, which carries no LLVM 7 (see the host section).
+      - if: win and not arm64
+        then:
           - python -c "import numba_cuda_mlir, os; assert os.path.exists(os.path.join(os.path.dirname(numba_cuda_mlir.__file__), 'lib', 'LLVM-C.dll'))"
 
 about:
