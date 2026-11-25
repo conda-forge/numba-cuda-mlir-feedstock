@@ -1,7 +1,7 @@
 schema_version: 1
 
 context:
-  version: "0.6.0"
+  version: "0.6.1"
   llvm_modern_commit: 3cbe75b1433a90a28db068d700b7effd2de8f401
 
 package:
@@ -10,7 +10,7 @@ package:
 
 source:
   - url: https://github.com/NVIDIA/numba-cuda-mlir/archive/refs/tags/v${{ version }}.tar.gz
-    sha256: c54789444c1a66087f6f613c221bfa37fa15b37671285983c511814da302c273
+    sha256: 29a2e0e5751feee36f7e57cfc11115c98ed1907c21d58ac166e014c9202d3c7d
     target_directory: src
     patches:
       - patches/pin-python-executable.patch
@@ -19,7 +19,7 @@ source:
     target_directory: llvm-modern-src
 
 build:
-  number: 2
+  number: 0
   skip:
     - not (linux or win)
     - match(python, "<3.11")
